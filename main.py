@@ -12,6 +12,8 @@ app = Flask(__name__)
 
 # Load sensitive values from environment variables
 CONFLUENCE_BASE_URL = "https://ocrolus.atlassian.net/wiki"
+EMAIL = os.getenv("EMAIL")
+API_TOKEN = os.getenv("API_TOKEN")
 
 # Function to search Confluence using REST API
 def search_confluence(query):
