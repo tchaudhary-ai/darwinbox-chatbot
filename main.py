@@ -1,17 +1,31 @@
 import logging
 logging.basicConfig(level=logging.DEBUG)
-from flask import Flask, render_template, request
+import requests
+from requests.auth import HTTPBasicAuth
 
-app = Flask(__name__)
+CONFLUENCE_BASE_URL = "https://yourcompany.atlassian.net/wiki"
+EMAIL = "your.email@yourcompany.com"
+API_TOKEN = "ATATT3xFfGF0FoEsbUXPvqHHTHLjFZXfm_8zyu7V3dgBaJdLTBv_-m0k-0z0z-nExyXh9L2TlSut9JBgPNb8KzgKcFu_3zHmH-fzodUL1tivWq5DfIvgd9Ln_swNSOMCzRSx50ZYX4Me8MMVE0WzPKuO80SkvPi0EU813CiQx3FjjJPTmP6CFOo=03A2B0AD"
 
-# Simple chatbot logic
-def get_response(user_input):
-    if "leave policy" in user_input.lower():
-        return "You can find the leave policy here: https://confluence.company.com/leave-policy"
-    elif "holiday list" in user_input.lower():
-        return "Here is the holiday list: https://confluence.company.com/holidays"
-    else:
-        return "Sorry, I didn't understand that. Try asking about leave policy or holiday list."
+def search_confluence(query):
+    url = f"{CONFLUENCE_BASE_URL}/rest/api/content/search"
+    params = {
+        "cql": f"text ~ \"{query}\" AND type=page",
+        "limit": 1
+    }
+    auth = HTTPBasicAuth(EMAIL, API_TOKEN)
+    headers = {
+        "Accept": "application/json"
+    }
+
+    response = requests.get(url, headers=headers, auth=auth, params=params)
+    if response.status_code == 200:
+        results = response.json().get("results", [])
+        if results:
+            title = results[0]["title"]
+            link = CONFLUENCE_BASE_URL + results[0]["_links"]["webui"]
+            return f"I found something in Confluence: [{title}]({link})"
+    return "I couldn't find anything relevant in Confluence."
 
 @app.route("/", methods=["GET", "POST"])
 def chatbot():
