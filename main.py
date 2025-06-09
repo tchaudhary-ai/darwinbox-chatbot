@@ -49,3 +49,4 @@ def chatbot():
         user_input = request.form["message"]
         response = search_confluence(user_input)
     return render_template("chat.html", response=response)
+    
