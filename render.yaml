@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: lattice-chatbot
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn main:app"
+    autoDeploy: true
+
+    envVars:
+      - key: LATTICE_API_KEY
+        sync: false   # This keeps the value private — set it manually in the Render dashboard
