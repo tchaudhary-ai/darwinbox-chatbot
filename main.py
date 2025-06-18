@@ -21,14 +21,14 @@ def get_user_by_email(input_email):
     }
 
     try:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, params={"limit": 1000})
         if response.status_code == 200:
             data = response.json()
             users = data.get("data", [])
 
-            # Loop through users to find the one that matches the input email
             for user in users:
-                if user.get("email", "").lower() == input_email.lower():
+                logging.debug(f"Checking user: {user.get('email')}")
+                if user.get("email", "").strip().lower() == input_email.strip().lower():
                     name = user.get("name", "N/A")
                     title = user.get("title", "N/A")
                     department = user.get("department", "N/A")
