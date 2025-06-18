@@ -2,76 +2,66 @@ import os
 import logging
 import requests
 from flask import Flask, render_template, request
+from requests.auth import HTTPBasicAuth
 
-# Enable logging
 logging.basicConfig(level=logging.DEBUG)
-
-# Initialize Flask app
 app = Flask(__name__)
 
-# Load Lattice API key from environment
-LATTICE_API_KEY = os.getenv("LATTICE_API_KEY")
+# Lattice credentials
+LATTICE_API_TOKEN = os.getenv("LATTICE_API_TOKEN")
+LATTICE_BASE_URL = "https://api.latticehq.com/v1"
 
-# Function to fetch a user by their email from Lattice
-def get_user_by_email(input_email):
-    url = "https://api.latticehq.com/v1/users"
-    headers = {
-        "Authorization": f"Bearer {LATTICE_API_KEY}",
-        "Content-Type": "application/json"
-    }
+# Get user profile by email
+def get_user_profile(email):
+    headers = {"Authorization": f"Bearer {LATTICE_API_TOKEN}"}
+    params = {"email": email}
+    url = f"{LATTICE_BASE_URL}/users"
+    res = requests.get(url, headers=headers, params=params)
+    if res.status_code == 200:
+        users = res.json().get("data", [])
+        return users[0] if users else None
+    else:
+        logging.error(f"User fetch failed: {res.text}")
+        return None
 
-    found_user = None
-    starting_after = None
-
-    try:
-        while True:
-            params = {"limit": 100}
-            if starting_after:
-                params["starting_after"] = starting_after
-
-            response = requests.get(url, headers=headers, params=params)
-            if response.status_code != 200:
-                logging.error(f"Lattice API error {response.status_code}: {response.text}")
-                return f"❌ Lattice API error {response.status_code}: {response.text}"
-
-            data = response.json()
-            users = data.get("data", [])
-            has_more = data.get("has_more", False)
-
-            for user in users:
-                email = user.get("email", "").strip().lower()
-                logging.debug(f"Checking Lattice user: {email}")
-                if email == input_email.strip().lower():
-                    found_user = user
-                    break
-
-            if found_user or not has_more:
-                break
-
-            if users:
-                starting_after = users[-1].get("id")
-
-        if found_user:
-            name = found_user.get("name", "N/A")
-            title = found_user.get("title", "N/A")
-            department = found_user.get("department", "N/A")
-            return (
-                f"✅ Found user: <strong>{name}</strong><br>"
-                f"📧 Email: {found_user.get('email')}<br>"
-                f"🧑‍💼 Title: {title}<br>"
-                f"🏢 Department: {department}"
-            )
+# Get latest review summary for the user
+def get_last_review_summary(user_id):
+    headers = {"Authorization": f"Bearer {LATTICE_API_TOKEN}"}
+    url = f"{LATTICE_BASE_URL}/reviews?user_id={user_id}"
+    res = requests.get(url, headers=headers)
+    if res.status_code == 200:
+        reviews = res.json().get("data", [])
+        if reviews:
+            last_review = reviews[-1]
+            summary = last_review.get("summary") or "No summary available."
+            return summary
         else:
-            return f"❌ No user found with email: {input_email}"
+            return "No reviews found for this user."
+    else:
+        logging.error(f"Review fetch failed: {res.text}")
+        return "Error fetching review summary."
 
-    except Exception as e:
-        logging.error(f"Exception while calling Lattice API: {e}")
-        return f"❌ Error: {e}"
-# Main chatbot route
 @app.route("/", methods=["GET", "POST"])
 def chatbot():
     response = ""
     if request.method == "POST":
-        user_input = request.form["message"]
-        response = get_user_by_email(user_input)
+        email = request.form["message"].strip()
+        user = get_user_profile(email)
+        if user:
+            name = user.get("name")
+            title = user.get("title")
+            department = user.get("department")
+            user_id = user.get("id")
+
+            review_summary = get_last_review_summary(user_id)
+
+            response = f"""
+            ✅ <strong>Found user: {name}</strong><br>
+            👤 Email: {email}<br>
+            🧩 Title: {title}<br>
+            🏢 Department: {department}<br>
+            📝 <strong>Last Review Summary:</strong><br>{review_summary}
+            """
+        else:
+            response = f"❌ No user found for email: {email}"
     return render_template("chat.html", response=response)
