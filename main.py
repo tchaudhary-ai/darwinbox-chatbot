@@ -12,8 +12,8 @@ app = Flask(__name__)
 # Load Lattice API key from environment
 LATTICE_API_KEY = os.getenv("LATTICE_API_KEY")
 
-# Function to check Lattice API connectivity using /v1/users
-def get_lattice_status():
+# Function to fetch a user by their email from Lattice
+def get_user_by_email(input_email):
     url = "https://api.latticehq.com/v1/users"
     headers = {
         "Authorization": f"Bearer {LATTICE_API_KEY}",
@@ -22,23 +22,30 @@ def get_lattice_status():
 
     try:
         response = requests.get(url, headers=headers)
-        logging.debug(f"Lattice API response: {response.status_code}")
-        
         if response.status_code == 200:
             data = response.json()
             users = data.get("data", [])
-            if not users:
-                return "✅ Connected to Lattice, but no users found."
-            first_user = users[0]
-            email = first_user.get("email", "N/A")
-            name = first_user.get("name", "N/A")
-            return f"✅ Lattice API is working!<br><br>👤 First user: <b>{name}</b><br>📧 Email: {email}"
+
+            # Loop through users to find the one that matches the input email
+            for user in users:
+                if user.get("email", "").lower() == input_email.lower():
+                    name = user.get("name", "N/A")
+                    title = user.get("title", "N/A")
+                    department = user.get("department", "N/A")
+                    return (
+                        f"✅ Found user: <strong>{name}</strong><br>"
+                        f"📧 Email: {input_email}<br>"
+                        f"🧑‍💼 Title: {title}<br>"
+                        f"🏢 Department: {department}"
+                    )
+
+            return f"❌ No user found with email: {input_email}"
         else:
             logging.error(f"Lattice API error {response.status_code}: {response.text}")
             return f"❌ Lattice API error {response.status_code}: {response.text}"
     except Exception as e:
         logging.error(f"Exception while calling Lattice API: {e}")
-        return f"❌ Exception while calling Lattice: {e}"
+        return f"❌ Error: {e}"
 
 # Main chatbot route
 @app.route("/", methods=["GET", "POST"])
@@ -46,5 +53,5 @@ def chatbot():
     response = ""
     if request.method == "POST":
         user_input = request.form["message"]
-        response = get_lattice_status()  # Email input is not used in this test
+        response = get_user_by_email(user_input)
     return render_template("chat.html", response=response)
