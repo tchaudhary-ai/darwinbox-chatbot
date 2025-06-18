@@ -20,33 +20,53 @@ def get_user_by_email(input_email):
         "Content-Type": "application/json"
     }
 
+    found_user = None
+    starting_after = None
+
     try:
-        response = requests.get(url, headers=headers, params={"limit": 1000})
-        if response.status_code == 200:
+        while True:
+            params = {"limit": 100}
+            if starting_after:
+                params["starting_after"] = starting_after
+
+            response = requests.get(url, headers=headers, params=params)
+            if response.status_code != 200:
+                logging.error(f"Lattice API error {response.status_code}: {response.text}")
+                return f"❌ Lattice API error {response.status_code}: {response.text}"
+
             data = response.json()
             users = data.get("data", [])
+            has_more = data.get("has_more", False)
 
             for user in users:
-                logging.debug(f"Checking user: {user.get('email')}")
-                if user.get("email", "").strip().lower() == input_email.strip().lower():
-                    name = user.get("name", "N/A")
-                    title = user.get("title", "N/A")
-                    department = user.get("department", "N/A")
-                    return (
-                        f"✅ Found user: <strong>{name}</strong><br>"
-                        f"📧 Email: {input_email}<br>"
-                        f"🧑‍💼 Title: {title}<br>"
-                        f"🏢 Department: {department}"
-                    )
+                email = user.get("email", "").strip().lower()
+                logging.debug(f"Checking Lattice user: {email}")
+                if email == input_email.strip().lower():
+                    found_user = user
+                    break
 
-            return f"❌ No user found with email: {input_email}"
+            if found_user or not has_more:
+                break
+
+            if users:
+                starting_after = users[-1].get("id")
+
+        if found_user:
+            name = found_user.get("name", "N/A")
+            title = found_user.get("title", "N/A")
+            department = found_user.get("department", "N/A")
+            return (
+                f"✅ Found user: <strong>{name}</strong><br>"
+                f"📧 Email: {found_user.get('email')}<br>"
+                f"🧑‍💼 Title: {title}<br>"
+                f"🏢 Department: {department}"
+            )
         else:
-            logging.error(f"Lattice API error {response.status_code}: {response.text}")
-            return f"❌ Lattice API error {response.status_code}: {response.text}"
+            return f"❌ No user found with email: {input_email}"
+
     except Exception as e:
         logging.error(f"Exception while calling Lattice API: {e}")
         return f"❌ Error: {e}"
-
 # Main chatbot route
 @app.route("/", methods=["GET", "POST"])
 def chatbot():
